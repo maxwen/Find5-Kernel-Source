@@ -1,0 +1,25 @@
+
+---------------------------------------------------------------------------------------------
+*************************
+Update Time:
+2013-05-07
+*************************
+Main Updates:
+1.Modify baseline data for tp auto test
+2.fixed bug of charge led not turn off when remove USB
+3.display black screen with backlight on when system resume
+4.modify for iphone headset mic
+5.fixed not resume when uplugin usb of charge finished
+6.resolve bug:kernel panic because of dma error owner
+7.add kgsl patch
+8.subsystem restart failue,the platform do not restart
+9.fix bug bluetooth headset caused system reboot
+10.Change disables error logs in the video driver which was enabled by default¡£
+11.fix bug detecting headset type not exactly  
+12.mask some kernel log for system-team
+13.fix call has no voice
+14.fix that adb_open dead 
+15.fix bug pluging USB caused system reboot
+16.optimizing flash time
+17.optimizing TP which advoiding click changed to slide
+--------------------------------------------------------------------------------------------

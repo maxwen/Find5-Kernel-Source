@@ -354,7 +354,10 @@ struct hci_conn {
 	__u8		auth;
 	void		*smp_conn;
 	struct timer_list smp_timer;
-
+//liuhd add for system crash when calling with  bt headset 
+#ifdef CONFIG_VENDOR_EDIT 
+	__u8		conn_valid; 
+#endif //liuhd modify end
 
 	void (*connect_cfm_cb)	(struct hci_conn *conn, u8 status);
 	void (*security_cfm_cb)	(struct hci_conn *conn, u8 status);

@@ -43,6 +43,9 @@ struct sysmon_subsys {
 	struct completion	resp_ready;
 	char			rx_buf[RX_BUF_SIZE];
 	enum transports		transport;
+/* OPPO 2013-04-02 zhenwx Add begin for platform restart due to modem fatal error  */
+      struct device           *dev;	
+/* OPPO 2013-04-02 zhenwx Add end */
 };
 
 static struct sysmon_subsys subsys[SYSMON_NUM_SS] = {
@@ -137,7 +140,12 @@ int sysmon_send_event(enum subsys_id dest_ss, const char *event_ss,
 	struct sysmon_subsys *ss = &subsys[dest_ss];
 	char tx_buf[TX_BUF_SIZE];
 	int ret;
+	/* OPPO 2013-04-02 zhenwx Add begin for platform restart due to modem fatal error  */
+       if (ss->dev == NULL)
+	   	return -ENODEV;
+	   
 
+/* OPPO 2013-04-02 zhenwx Add end */
 	if (dest_ss < 0 || dest_ss >= SYSMON_NUM_SS ||
 	    notif < 0 || notif >= SUBSYS_NOTIF_TYPE_COUNT ||
 	    event_ss == NULL)
@@ -179,7 +187,11 @@ out:
        const char expect[] = "system:ack";
        size_t prefix_len = ARRAY_SIZE(expect) - 1;
        int ret;
-	   
+	   /* OPPO 2013-04-02 zhenwx Add begin for platform restart due to modem fatal error  */
+      if (ss->dev == NULL)
+	  	return -ENODEV;
+	  
+/* OPPO 2013-04-02 zhenwx Add end */
        if (dest_ss < 0 || dest_ss >= SYSMON_NUM_SS)
                return -EINVAL;
 
@@ -217,7 +229,12 @@ int sysmon_get_reason(enum subsys_id dest_ss, char *buf, size_t len)
 	const char expect[] = "ssr:return:";
 	size_t prefix_len = ARRAY_SIZE(expect) - 1;
 	int ret;
+/* OPPO 2013-04-02 zhenwx Add begin for platform restart due to modem fatal error  */
+       if (ss->dev == NULL)
+	   	return -ENODEV;
+	   
 
+/* OPPO 2013-04-02 zhenwx Add end */
 	if (dest_ss < 0 || dest_ss >= SYSMON_NUM_SS ||
 	    buf == NULL || len == 0)
 		return -EINVAL;
@@ -264,8 +281,10 @@ static int sysmon_probe(struct platform_device *pdev)
 	struct sysmon_subsys *ss;
 	int ret;
 
+
 	if (pdev->id < 0 || pdev->id >= SYSMON_NUM_SS)
 		return -ENODEV;
+	printk("%s ==\r\n", __func__);
 
 	ss = &subsys[pdev->id];
 	mutex_init(&ss->lock);
@@ -297,14 +316,21 @@ static int sysmon_probe(struct platform_device *pdev)
 	default:
 		return -EINVAL;
 	}
+/* OPPO 2013-04-02 zhenwx Add begin for platform restart due to modem fatal error  */
+       ss->dev = &pdev->dev;
 
+/* OPPO 2013-04-02 zhenwx Add end */
 	return 0;
 }
 
 static int __devexit sysmon_remove(struct platform_device *pdev)
 {
 	struct sysmon_subsys *ss = &subsys[pdev->id];
+/* OPPO 2013-04-02 zhenwx Add begin for platform restart due to modem fatal error  */
+      ss->dev = NULL;
+      mutex_lock(&ss->lock);
 
+/* OPPO 2013-04-02 zhenwx Add end */
 	switch (ss->transport) {
 	case TRANSPORT_SMD:
 		smd_close(ss->chan);
@@ -313,7 +339,10 @@ static int __devexit sysmon_remove(struct platform_device *pdev)
 		hsic_sysmon_close(HSIC_SYSMON_DEV_EXT_MODEM);
 		break;
 	}
+/* OPPO 2013-04-02 zhenwx Add begin for platform restart due to modem fatal error  */
+mutex_unlock(&ss->lock); 
 
+/* OPPO 2013-04-02 zhenwx Add end */
 	return 0;
 }
 

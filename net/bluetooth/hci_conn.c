@@ -392,10 +392,16 @@ static void hci_conn_idle(unsigned long arg)
 	struct hci_conn *conn = (void *) arg;
 
 	BT_DBG("conn %p mode %d", conn, conn->mode);
-
+	
+	//liuhd add for system crash when calling with	bt headset 
+#ifndef CONFIG_VENDOR_EDIT 
 	hci_dev_lock(conn->hdev);
 	hci_conn_enter_sniff_mode(conn);
 	hci_dev_unlock(conn->hdev);
+#else
+	hci_conn_enter_sniff_mode(conn);
+#endif //liuhd modify end
+
 }
 
 static void hci_conn_rssi_update(struct work_struct *work)
@@ -450,6 +456,12 @@ struct hci_conn *hci_conn_add(struct hci_dev *hdev, int type,
 
 	conn->power_save = 1;
 	conn->disc_timeout = HCI_DISCONN_TIMEOUT;
+	//liuhd add for system crash when calling with	bt headset 
+#ifdef CONFIG_VENDOR_EDIT 
+	conn->conn_valid = true;
+	spin_lock_init(&conn->lock);
+#endif //liuhd add end
+
 	wake_lock_init(&conn->idle_lock, WAKE_LOCK_SUSPEND, "bt_idle");
 
 	switch (type) {
@@ -521,6 +533,13 @@ int hci_conn_del(struct hci_conn *conn)
 	struct hci_dev *hdev = conn->hdev;
 
 	BT_DBG("%s conn %p handle %d", hdev->name, conn, conn->handle);
+	
+//liuhd add for system crash when calling with	bt headset 
+#ifdef CONFIG_VENDOR_EDIT 
+	spin_lock_bh(&conn->lock);
+	conn->conn_valid = false; /* conn data is being released */
+	spin_unlock_bh(&conn->lock);
+#endif //liuhd add end
 
 	/* Make sure no timers are running */
 	del_timer(&conn->idle_timer);
@@ -970,9 +989,20 @@ void hci_conn_enter_active_mode(struct hci_conn *conn, __u8 force_active)
 
 timer:
 	if (hdev->idle_timeout > 0) {
+//liuhd add for system crash when calling with	bt headset 
+#ifndef CONFIG_VENDOR_EDIT 
 		mod_timer(&conn->idle_timer,
 			jiffies + msecs_to_jiffies(hdev->idle_timeout));
 		wake_lock(&conn->idle_lock);
+#else
+		spin_lock_bh(&conn->lock);
+		if (conn->conn_valid) {
+			mod_timer(&conn->idle_timer,
+				jiffies + msecs_to_jiffies(hdev->idle_timeout));
+			wake_lock(&conn->idle_lock);
+		}
+		spin_unlock_bh(&conn->lock);
+#endif //liuhd add end
 	}
 }
 

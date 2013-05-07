@@ -475,8 +475,12 @@ void show_regs(struct pt_regs * regs)
 {
 	printk("\n");
 	printk("Pid: %d, comm: %20s\n", task_pid_nr(current), current->comm);
+/*OPPO,Jiangsm delete begin for log collecting temporarily,2013-4-16*/
+#if 0
 	__show_regs(regs);
 	dump_stack();
+#endif
+/*OPPO,Jiangsm delete end,2013-4-16*/
 }
 
 ATOMIC_NOTIFIER_HEAD(thread_notify_head);

@@ -2483,4 +2483,12 @@ config FB_MSM_MIPI_BACKLIGHT_LM3528
 	default y
 # add by zhengzk end 
 
+# add by zhenwx start
+config MODEM_ERR_ENTER_RAMDUMP
+	bool "MODEM_ERR_ENTER_RAMDUMP"
+    default n
+       help 
+        modem error interrupt been detected,system enter ramdump mode
+# add by zhenwx end 
+
 endif

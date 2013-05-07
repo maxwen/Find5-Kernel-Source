@@ -350,7 +350,13 @@ static ssize_t otracer_write(struct file *filp, const char __user *buf,
 /* OPPO 2011-03-02 huanggd Add begin for oppo logo display */
 extern int fbcon_takeover_global(int show_logo) ;
 /* OPPO 2011-03-02 huanggd Add end */
-static bool otrace_on = false;
+/* OPPO 2013-01-30 zhenwx Add begin for modem fatal error enter  ramdump */
+#ifdef CONFIG_MODEM_ERR_ENTER_RAMDUMP
+ bool otrace_on = false;
+#else
+ static bool otrace_on = false;	  
+#endif
+/* OPPO 2013-01-30 zhenwx Modify end */	
 bool is_otrace_on(void)
 {
 	return otrace_on;

@@ -36,16 +36,16 @@ static struct mipi_dsi_phy_ctrl dsi_video_mode_phy_db_720p = {
 static struct mipi_dsi_phy_ctrl dsi_video_mode_phy_db_1080p = { 
 	/* 1920*1200, RGB888, 4 Lane 60 fps video mode */ 
 	/* regulator */ 
-	{0x03, 0x0a, 0x04, 0x00, 0x20}, 
+	{0x09, 0x08, 0x05, 0x00, 0x20},
 	/* timing */ 
-	{0xea, 0x9a, 0x3b, 0x00, 0xad, 0xa7, 0x3d, 0x9c, 
+	{0xe9, 0x5e, 0x2c, 0x00, 0x7b, 0x7c, 0x30, 0x61, 
 	0x42, 0x03, 0x04, 0xa0}, 
 	/* phy ctrl */ 
 	{0x5f, 0x00, 0x00, 0x10}, 
 	/* strength */ 
 	{0xff, 0x00, 0x06, 0x00}, 
 	/* pll control */ 
-	{0x0, 0x7f, 0x31, 0xda, 0x00, 0x50, 0x48, 0x63,
+	{0x0, 0x49, 0x30, 0xc4, 0x00, 0x20, 0x07, 0x62,
 	0x41, 0x0f, 0x01, 
 	0x00, 0x14, 0x03, 0x00, 0x02, 0x00, 0x20, 0x00, 0x01 }, 
 		//{0x0, 0xcc, 0x31, 0xda, 0x00, 0x40, 0x03, 0x62, 
@@ -134,12 +134,17 @@ static int __init mipi_video_orise_720p_pt_init(void)
 		pinfo.wait_cycle = 0;
 		pinfo.bpp = 24;
 #if 1		
-		pinfo.lcdc.h_back_porch = 100;//80;
-		pinfo.lcdc.h_front_porch = 130;//120;
-		pinfo.lcdc.h_pulse_width = 8;
-		pinfo.lcdc.v_back_porch = 5;		//must > 4,Otherwise,it will increase the burden of clock	huyu
-		pinfo.lcdc.v_front_porch = 3;
-		pinfo.lcdc.v_pulse_width = 2;
+	/* OPPO 2013-03-07 Gousj Modify begin for solve the issue of lack of virtical pixel. */	
+		//Gousj modified  h_back_porch  from 100 to 101 		
+		pinfo.lcdc.h_back_porch = 101;//100;//80;		
+		pinfo.lcdc.h_front_porch = 130;//120		
+		pinfo.lcdc.h_pulse_width = 8;		
+		//Modified by Gousj on date 2013-3-4 ,the value of v_back_porch decreased from 5 to 4 .		
+		pinfo.lcdc.v_back_porch = 4;//5		//must > 4,Otherwise,it will increase the burden of clock	huyu		
+		pinfo.lcdc.v_front_porch = 3;		
+		//Modified by Gousj on date 2013-3-4 ,the value of v_pulse_width decreased from 2 to 1 .		
+		pinfo.lcdc.v_pulse_width = 1;//2;		
+	/* OPPO 2013-03-07 Gousj Modify end */
 #else
 		pinfo.lcdc.h_back_porch = 50;
 		pinfo.lcdc.h_front_porch = 100;
@@ -179,8 +184,8 @@ static int __init mipi_video_orise_720p_pt_init(void)
 		pinfo.mipi.data_lane1 = TRUE;
 		pinfo.mipi.data_lane2 = TRUE;
 		pinfo.mipi.data_lane3 = TRUE;
-		pinfo.mipi.t_clk_post = 0x19;
-		pinfo.mipi.t_clk_pre = 0x37;
+		pinfo.mipi.t_clk_post = 0x25;//0x19;
+		pinfo.mipi.t_clk_pre = 0x36;//0x37;
 		pinfo.mipi.stream = 0; /* dma_p */
 		pinfo.mipi.mdp_trigger = 0;
 		pinfo.mipi.dma_trigger = DSI_CMD_TRIGGER_SW;

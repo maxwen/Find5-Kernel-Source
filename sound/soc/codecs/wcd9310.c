@@ -6468,7 +6468,9 @@ static irqreturn_t tabla_release_handler(int irq, void *data)
 	printk(KERN_INFO "headset mic key release\n");
 	#endif
 	/*OPPO 2012-07-27 zhzhyon Add end*/
-	tabla_codec_drive_v_to_micbias(codec, 10000);
+	/*OPPO 2013-03-38 zhzhyon Modify for iphone mic*/
+	//tabla_codec_drive_v_to_micbias(codec, 10000);
+	tabla_codec_drive_v_to_micbias(codec, 80000);
 
 	if (priv->buttons_pressed & TABLA_JACK_BUTTON_MASK) {
 		ret = tabla_cancel_btn_work(priv);

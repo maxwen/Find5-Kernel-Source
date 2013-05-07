@@ -1271,7 +1271,7 @@ static int vfe32_configure_pingpong_buffers(int id, int path)
 	outch = vfe32_get_ch(path);
 	if (outch->ping.ch_paddr[0] && outch->pong.ch_paddr[0]) {
 		/* Configure Preview Ping Pong */
-		pr_info("%s Configure ping/pong address for %d",
+		pr_info("%s Configure ping/pong address for %d\n",
 						__func__, path);
 		vfe32_put_ch_ping_addr(outch->ch0,
 			outch->ping.ch_paddr[0]);
@@ -3027,6 +3027,11 @@ static void vfe32_process_error_irq(uint32_t errStatus)
 		reg_value = msm_camera_io_r(
 				vfe32_ctrl->vfebase + VFE_VIOLATION_STATUS);
 		pr_err("%s: violationStatus  = 0x%x\n", __func__, reg_value);
+		msm_camera_io_w_mb(/*OPPO*/
+			CAMIF_COMMAND_STOP_IMMEDIATELY,
+			vfe32_ctrl->vfebase +
+			VFE_CAMIF_COMMAND);
+		vfe32_send_isp_msg(vfe32_ctrl, MSG_ID_CAMIF_ERROR);/*OPPO*/
 	}
 
 	if (errStatus & VFE32_IMASK_IMG_MAST_0_BUS_OVFL)

@@ -291,6 +291,12 @@ static void mdm_disable_irqs(void)
 	disable_irq_nosync(mdm_drv->mdm_status_irq);
 }
 
+/* OPPO 2013-03-08 zhenwx Add begin for modem fatal error enter  ramdump */
+#ifdef CONFIG_MODEM_ERR_ENTER_RAMDUMP
+extern int download_mode;
+extern bool otrace_on;
+#endif
+/* OPPO 2013-03-08 zhenwx Add end */
 static irqreturn_t mdm_errfatal(int irq, void *dev_id)
 {
 	pr_debug("%s: mdm got errfatal interrupt\n", __func__);
@@ -298,6 +304,13 @@ static irqreturn_t mdm_errfatal(int irq, void *dev_id)
 		(gpio_get_value(mdm_drv->mdm2ap_status_gpio) == 1)) {
 		pr_info("%s: Reseting the mdm due to an errfatal\n", __func__);
 		mdm_drv->mdm_ready = 0;
+/* OPPO 2013-03-08 zhenwx Add begin for modem fatal error enter  ramdump */
+#ifdef CONFIG_MODEM_ERR_ENTER_RAMDUMP
+		download_mode = 1;
+		otrace_on = true;
+		panic("mdm_errfatal panic\n");
+#endif
+/* OPPO 2013-03-08 zhenwx Add end */		
 		subsystem_restart(EXTERNAL_MODEM);
 	}
 	return IRQ_HANDLED;

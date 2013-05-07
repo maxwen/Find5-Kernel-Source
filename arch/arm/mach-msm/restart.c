@@ -66,11 +66,17 @@ static void *dload_mode_addr;
 /* Download mode master kill-switch */
 static int dload_set(const char *val, struct kernel_param *kp);
 /* OPPO 2012-11-27  zwx modified begin for reboot after crash   */
+#ifdef CONFIG_MODEM_ERR_ENTER_RAMDUMP
+	int download_mode = 0;
+#else
+
 #if 0  
 static int download_mode = 1;
 #else
 static int download_mode = 0;
 #endif
+#endif
+
 /* OPPO 2012-11-27  zwx modified end   */
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);

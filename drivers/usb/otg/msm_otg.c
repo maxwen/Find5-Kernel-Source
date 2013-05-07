@@ -2259,6 +2259,10 @@ static void msm_otg_sm_work(struct work_struct *w)
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
 			motg->chg_type = USB_INVALID_CHARGER;
 			msm_otg_notify_charger(motg, 0);
+			
+			/* OPPO 2013-03-11 chendx Add begin for charger remove */
+			pm8921_chg_connected(USB_INVALID_CHARGER);
+			/* OPPO 2013-03-11 chendx Add end */
 			msm_otg_reset(otg->phy);
 			pm_runtime_put_noidle(otg->phy->dev);
 			pm_runtime_suspend(otg->phy->dev);

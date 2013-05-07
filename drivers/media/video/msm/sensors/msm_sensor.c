@@ -19,6 +19,8 @@
 #include <mach/vreg.h>
 /* OPPO 2012-09-15 yxq added end */
 
+static DEFINE_MUTEX( msm_sensor_setting_lock);/*OPPO*/
+
 /*=============================================================*/
 int32_t msm_sensor_adjust_frame_lines(struct msm_sensor_ctrl_t *s_ctrl,
 	uint16_t res)
@@ -141,7 +143,7 @@ int32_t msm_sensor_write_output_settings(struct msm_sensor_ctrl_t *s_ctrl,
 
 void msm_sensor_start_stream(struct msm_sensor_ctrl_t *s_ctrl)
 {
-	CDBG("%s: E\n", __func__);
+	CDBG("%s: E\n", __func__);	
 	msm_camera_i2c_write_tbl(
 		s_ctrl->sensor_i2c_client,
 		s_ctrl->msm_sensor_reg->start_stream_conf,
@@ -152,12 +154,12 @@ void msm_sensor_start_stream(struct msm_sensor_ctrl_t *s_ctrl)
 
 void msm_sensor_stop_stream(struct msm_sensor_ctrl_t *s_ctrl)
 {
-	CDBG("%s: E\n", __func__);
+	CDBG("%s: E\n", __func__);	
 	msm_camera_i2c_write_tbl(
 		s_ctrl->sensor_i2c_client,
 		s_ctrl->msm_sensor_reg->stop_stream_conf,
 		s_ctrl->msm_sensor_reg->stop_stream_conf_size,
-		s_ctrl->msm_sensor_reg->default_data_type);
+		s_ctrl->msm_sensor_reg->default_data_type);	
 	CDBG("%s: X\n", __func__);
 }
 
@@ -291,6 +293,7 @@ int32_t msm_sensor_setting1(struct msm_sensor_ctrl_t *s_ctrl,
 	}
 	return rc;
 }
+/*
 int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 			int update_type, int res)
 {
@@ -331,6 +334,78 @@ int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
 		msleep(30);
 	}
 	CDBG("%s: X\n", __func__);
+	return rc;
+}
+*/
+
+static int
+msm_sensor_setting_thread(void *data)
+{
+	struct msm_sensor_ctrl_t *s_ctrl = data;
+	printk("%s: E\n", __func__);
+	mutex_lock(&msm_sensor_setting_lock);
+	if(s_ctrl->init_state == 0) {
+		printk("%s: cancelled\n", __func__);		
+		mutex_unlock(&msm_sensor_setting_lock);
+		return 0;
+	}
+	s_ctrl->prepared_res = 0;
+	msm_sensor_write_init_settings(s_ctrl);
+	msm_sensor_write_res_settings(s_ctrl, s_ctrl->prepared_res);
+	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);	
+	s_ctrl->init_state = 0;
+	mutex_unlock(&msm_sensor_setting_lock);
+	printk("%s: X\n", __func__);
+	return 0;
+}
+
+int32_t msm_sensor_setting(struct msm_sensor_ctrl_t *s_ctrl,
+			int update_type, int res)
+{
+	int32_t rc = 0;
+
+	printk("%s: update_type=%d, res=%d\n", __func__, update_type, res);
+	mutex_lock(&msm_sensor_setting_lock);	
+	s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
+	if (update_type == MSM_SENSOR_REG_INIT) {
+		s_ctrl->init_state = 1;		
+		s_ctrl->curr_csi_params = NULL; 
+		mutex_unlock(&msm_sensor_setting_lock);
+		kthread_run(msm_sensor_setting_thread, s_ctrl, "msm_sensor_setting");
+	} else if(update_type == MSM_SENSOR_UPDATE_PERIODIC) {
+		if(s_ctrl->init_state)
+			pr_err("%s: setting thread is not finished yet\n",__func__);
+	        if(s_ctrl->prepared_res != res) {
+			msm_sensor_write_res_settings(s_ctrl, res);
+			s_ctrl->prepared_res = res;
+	        }
+		if (s_ctrl->curr_csi_params != s_ctrl->csi_params[res]) {
+			s_ctrl->curr_csi_params = s_ctrl->csi_params[res];
+			s_ctrl->curr_csi_params->csid_params.lane_assign =
+				s_ctrl->sensordata->sensor_platform_info->
+				csi_lane_params->csi_lane_assign;
+			s_ctrl->curr_csi_params->csiphy_params.lane_mask =
+				s_ctrl->sensordata->sensor_platform_info->
+				csi_lane_params->csi_lane_mask;
+			v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
+				NOTIFY_CSID_CFG,
+				&s_ctrl->curr_csi_params->csid_params);
+			mb();
+			v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
+				NOTIFY_CSIPHY_CFG,
+				&s_ctrl->curr_csi_params->csiphy_params);
+			mb();
+			//msleep(20);
+		}
+
+		v4l2_subdev_notify(&s_ctrl->sensor_v4l2_subdev,
+			NOTIFY_PCLK_CHANGE, &s_ctrl->msm_sensor_reg->
+			output_settings[res].op_pixel_clk);
+		s_ctrl->func_tbl->sensor_start_stream(s_ctrl);
+		//msleep(30);
+		mutex_unlock(&msm_sensor_setting_lock);
+	}
+	printk("%s: X\n", __func__);
 	return rc;
 }
 
@@ -591,7 +666,9 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				rc = -EFAULT;
 				break;
 			}
+			mutex_lock(&msm_sensor_setting_lock);
 			s_ctrl->func_tbl->sensor_start_stream(s_ctrl);
+			mutex_unlock(&msm_sensor_setting_lock);
 			break;
 
 		case CFG_STOP_STREAM:
@@ -599,7 +676,10 @@ int32_t msm_sensor_config(struct msm_sensor_ctrl_t *s_ctrl, void __user *argp)
 				rc = -EFAULT;
 				break;
 			}
+			mutex_lock(&msm_sensor_setting_lock);
 			s_ctrl->func_tbl->sensor_stop_stream(s_ctrl);
+			s_ctrl->init_state = 0;
+			mutex_unlock(&msm_sensor_setting_lock);	
 			break;
 
 		case CFG_GET_CSI_PARAMS:
@@ -930,7 +1010,7 @@ int32_t s5k6a3yx_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 	}
   #else
  	// for old GSBI1's voltage
-	ldo21 = regulator_get(NULL, "8921_l21");
+	ldo21 = regulator_get(&s_ctrl->sensor_i2c_client->client->dev, "8921_l21");
 	if (IS_ERR(ldo21)){
 		pr_err("%s: VREG LDO21 get failed\n", __func__);
 		ldo21 = NULL;
@@ -944,9 +1024,9 @@ int32_t s5k6a3yx_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("%s: VREG LDO21 enable failed\n", __func__);
 		//goto ldo16_enable_failed;
 		}
-	msleep(5);
+	mdelay(5);
 	
-	ldo8 = regulator_get(NULL, "8921_l8");
+	ldo8 = regulator_get(&s_ctrl->sensor_i2c_client->client->dev, "8921_l8");
 	if (IS_ERR(ldo8)){
 		pr_err("%s: VREG LDO8 get failed\n", __func__);
 		ldo8 = NULL;
@@ -968,10 +1048,10 @@ int32_t s5k6a3yx_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("%s: config gpio failed\n", __func__);
 		goto config_gpio_failed;
 	}
-	msleep(1);
+	mdelay(1);
 
 /* OPPO 2012-09-15 yxq added begin for reason */
-	lvs5 = regulator_get(NULL, "8921_lvs5");
+	lvs5 = regulator_get(&s_ctrl->sensor_i2c_client->client->dev, "8921_lvs5");
 	if (IS_ERR(lvs5)){
 		pr_err("%s: VREG LVS5 get failed\n", __func__);
 		lvs5 = NULL;
@@ -981,7 +1061,7 @@ int32_t s5k6a3yx_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 		pr_err("%s: VREG LVS5 enable failed\n", __func__);
 		goto lvs5_enable_failed;
 		}
-	ldo16 = regulator_get(NULL, "8921_l16");
+	ldo16 = regulator_get(&s_ctrl->sensor_i2c_client->client->dev, "8921_l16");
 	if (IS_ERR(ldo16)){
 		pr_err("%s: VREG LDO16 get failed\n", __func__);
 		ldo16 = NULL;

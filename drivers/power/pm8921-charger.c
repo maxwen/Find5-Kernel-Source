@@ -380,6 +380,7 @@ struct pm8921_chg_chip {
 
 	#ifdef CONFIG_HAS_WAKELOCK
 	struct wake_lock pm8921_wake_lock;
+	struct wake_lock prevent_suspend_lock;
 	#endif
 
 	#ifdef TEMPERATURE_CHARGE_TEST_FEATURE
@@ -3184,9 +3185,9 @@ static void handle_usb_insertion_removal(struct pm8921_chg_chip *chip)
 		/* USB unplugged reset target current */
 		usb_target_ma = 0;
 		pm8921_chg_disable_irq(chip, CHG_GONE_IRQ);
-	/* OPPO 2012-08-09 chendx Add begin for USBIN charger remove */
+	/* OPPO 2012-08-09 chendx Add begin for USBIN charger remove from otg driver */
 	#ifdef CONFIG_VENDOR_EDIT
-		pm8921_chg_connected(USB_INVALID_CHARGER);
+		//pm8921_chg_connected(USB_INVALID_CHARGER);
 	#endif
 	
 /* OPPO 2013-02-28 chendx Add begin for notify with bms */
@@ -3486,6 +3487,15 @@ static irqreturn_t usbin_valid_irq_handler(int irq, void *data)
 	schedule_work(&the_chip->cancel_charge_det);
 #endif
 /*OPPO,Jiangsm add end*/
+
+#ifdef CONFIG_VENDOR_EDIT
+	if(!is_usb_chg_plugged_in(the_chip)){
+		/*add timeout wake lock to prevent suspend quickly ,make sure system resume*/
+		wake_lock_timeout(&the_chip->prevent_suspend_lock, HZ*3);
+		pm8921_chg_connected(USB_INVALID_CHARGER);
+	}
+#endif
+
 	if (usb_target_ma)
 		schedule_delayed_work(&the_chip->vin_collapse_check_work,
 				      round_jiffies_relative(msecs_to_jiffies
@@ -3556,6 +3566,8 @@ static irqreturn_t vbatdet_low_irq_handler(int irq, void *data)
 /* OPPO 2012-08-20 chendx Modify end */
 }
 
+/* OPPO 2013-04-22 chendx Delete begin for USBIN IRQ */
+#ifndef CONFIG_VENDOR_EDIT
 static irqreturn_t usbin_uv_irq_handler(int irq, void *data)
 {
 	pr_err("USB UnderVoltage\n");
@@ -3567,6 +3579,8 @@ static irqreturn_t vbat_ov_irq_handler(int irq, void *data)
 	pr_debug("fsm_state=%d\n", pm_chg_get_fsm_state(data));
 	return IRQ_HANDLED;
 }
+#endif
+/* OPPO 2013-04-22 chendx Delete end */
 
 static irqreturn_t chgwdog_irq_handler(int irq, void *data)
 {
@@ -4217,7 +4231,6 @@ int pm8921_chg_connected(enum usb_chg_type chg_type)
 		
 	}else if(chg_type == USB_INVALID_CHARGER){
 	    power_supply_changed(&the_chip->batt_psy);
-			
 	    /* set the wake lock, do not let sytem sleep. */
 		#ifdef CONFIG_HAS_WAKELOCK
 		wake_unlock(&the_chip->pm8921_wake_lock);
@@ -5893,8 +5906,12 @@ static void __devinit determine_initial_state(struct pm8921_chg_chip *chip)
 	pm8921_chg_enable_irq(chip, USBIN_VALID_IRQ);
 	pm8921_chg_enable_irq(chip, BATT_REMOVED_IRQ);
 	pm8921_chg_enable_irq(chip, BATT_INSERTED_IRQ);
+/* OPPO 2013-04-22 chendx Delete begin for USBIN irq */
+#ifndef CONFIG_VENDOR_EDIT
 	pm8921_chg_enable_irq(chip, USBIN_OV_IRQ);
 	pm8921_chg_enable_irq(chip, USBIN_UV_IRQ);
+#endif
+/* OPPO 2013-04-22 chendx Delete end */
 	pm8921_chg_enable_irq(chip, DCIN_OV_IRQ);
 	pm8921_chg_enable_irq(chip, DCIN_UV_IRQ);
 	pm8921_chg_enable_irq(chip, CHGFAIL_IRQ);
@@ -5947,9 +5964,13 @@ struct pm_chg_irq_init_data chg_irq_data[] = {
 						batt_inserted_irq_handler),
 	CHG_IRQ(VBATDET_LOW_IRQ, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 						vbatdet_low_irq_handler),
+/* OPPO 2013-04-22 chendx Delete begin for USBIN IRQ */
+#ifndef CONFIG_VENDOR_EDIT
 	CHG_IRQ(USBIN_UV_IRQ, IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
 							usbin_uv_irq_handler),
 	CHG_IRQ(VBAT_OV_IRQ, IRQF_TRIGGER_RISING, vbat_ov_irq_handler),
+#endif
+/* OPPO 2013-04-22 chendx Delete end */
 	CHG_IRQ(CHGWDOG_IRQ, IRQF_TRIGGER_RISING, chgwdog_irq_handler),
 	CHG_IRQ(VCP_IRQ, IRQF_TRIGGER_RISING, vcp_irq_handler),
 	CHG_IRQ(ATCDONE_IRQ, IRQF_TRIGGER_RISING, atcdone_irq_handler),
@@ -6918,8 +6939,12 @@ static int __devinit pm8921_charger_probe(struct platform_device *pdev)
 	}
 
 	enable_irq_wake(chip->pmic_chg_irq[USBIN_VALID_IRQ]);
+/* OPPO 2013-04-22 chendx Delete begin for USBIN IRQ */
+#ifndef CONFIG_VENDOR_EDIT
 	enable_irq_wake(chip->pmic_chg_irq[USBIN_OV_IRQ]);
 	enable_irq_wake(chip->pmic_chg_irq[USBIN_UV_IRQ]);
+#endif
+/* OPPO 2013-04-22 chendx Delete end */
 	/* OPPO 2012-08-09 chendx Delete begin for 12025 not use TEMP IRQ */
 	#ifndef CONFIG_VENDOR_EDIT
 	enable_irq_wake(chip->pmic_chg_irq[BAT_TEMP_OK_IRQ]);
@@ -6952,6 +6977,7 @@ static int __devinit pm8921_charger_probe(struct platform_device *pdev)
 	/* init mutex*/
 	#ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_init(&chip->pm8921_wake_lock, WAKE_LOCK_SUSPEND, "pm8921-charger");
+	wake_lock_init(&chip->prevent_suspend_lock, WAKE_LOCK_SUSPEND, "pm8921-prevent-lock");
 	#endif
 	#endif
 	/* OPPO 2012-08-31 chendx Add end */
@@ -6991,6 +7017,7 @@ static int __devexit pm8921_charger_remove(struct platform_device *pdev)
 	/* destroy mutex */
 	#ifdef CONFIG_HAS_WAKELOCK
 	wake_lock_destroy(&chip->pm8921_wake_lock);
+	wake_lock_destroy(&chip->prevent_suspend_lock);
 	#endif
 
 

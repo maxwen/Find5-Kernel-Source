@@ -495,11 +495,41 @@ _kgsl_sharedmem_page_alloc(struct kgsl_memdesc *memdesc,
 	struct page **pages = NULL;
 	pgprot_t page_prot = pgprot_writecombine(PAGE_KERNEL);
 	void *ptr;
+	/* OPPO 2013-4-1 Neal add begin*/
+       /*
+        *Limit the size of individual GPU memory allocations to the amount of
+        *free memory on the system minus 32MB.  This early check gives us the
+        *chance to verify that the user didn't ask for an obscene amount of
+        *memory, and also to limit the chance that an allocation attempt will
+        *invoke the OOM killer.
+        *The 32MB buffer in particular should keep us out of the clutches of
+        *the OOM killer. That number is the same amount of buffer used in
+        *the page allocation alogrithms and it should keep the GPU from further
+        *throwing fuel on the fire of a low memory situation.
+        */
+       /*
+        * Add guard page to the end of the allocation when the
+        * IOMMU is in use.
+        */
 
-	/*
-	 * Add guard page to the end of the allocation when the
-	 * IOMMU is in use.
-	 */
+	 struct sysinfo si;
+
+       /*
+        * Get the current memory information to be used in deciding if we
+        * should go ahead with this allocation
+        */
+
+       si_meminfo(&si);
+
+       /*
+        * Don't let the user allocate more free memory then is available on the
+        * system
+        */
+
+       if (size >= (si.freeram << PAGE_SHIFT))
+               return -ENOMEM;
+
+    /* OPPO 2013-4-1 Neal add end*/
 
 	if (kgsl_mmu_get_mmutype() == KGSL_MMU_TYPE_IOMMU)
 		sglen++;

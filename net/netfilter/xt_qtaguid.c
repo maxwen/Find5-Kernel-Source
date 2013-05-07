@@ -2305,9 +2305,9 @@ static int ctrl_cmd_tag(const char *input)
 	if (argc < 4) {
 		uid = current_fsuid();
 	} else if (!can_impersonate_uid(uid)) {
-		pr_info("qtaguid: ctrl_tag(%s): "
-			"insufficient priv from pid=%u tgid=%u uid=%u\n",
-			input, current->pid, current->tgid, current_fsuid());
+	//	pr_info("qtaguid: ctrl_tag(%s): "
+	//		"insufficient priv from pid=%u tgid=%u uid=%u\n",
+	//		input, current->pid, current->tgid, current_fsuid());
 		res = -EPERM;
 		goto err_put;
 	}

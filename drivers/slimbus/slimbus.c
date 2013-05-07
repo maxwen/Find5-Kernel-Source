@@ -27,6 +27,12 @@
 
 #define SLIM_HDL_TO_CHIDX(hdl)	((u16)(hdl) & 0xFF)
 
+/*OPPO 2013-04-19 zhzhyon Add for no voice*/
+#ifdef CONFIG_VENDOR_EDIT
+#define SLIM_GRP_TO_NCHAN(hdl) ((u16)(hdl >> 8) & 0xFF)
+#endif
+/*OPPO 2013-04-19 zhzhyon Add end*/
+
 #define SLIM_SLAVE_PORT(p, la)	(((la)<<16) | (p))
 #define SLIM_MGR_PORT(p)	((0xFF << 16) | (p))
 #define SLIM_LA_MANAGER		0xFF
@@ -1766,7 +1772,13 @@ int slim_define_ch(struct slim_device *sb, struct slim_ch *prop, u16 *chanh,
 	}
 
 	if (grp)
+		/*OPPO 2013-04-19 zhzhyon Modify for no voice*/
+		#ifndef CONFIG_VENDOR_EDIT
 		*grph = chanh[0];
+		#else
+		 *grph = ((nchan << 8) | SLIM_HDL_TO_CHIDX(chanh[0]));
+		#endif
+		/*OPPO 2013-04-19 zhzhyon Modify end*/
 	for (i = 0; i < nchan; i++) {
 		u8 chan = SLIM_HDL_TO_CHIDX(chanh[i]);
 		struct slim_ich *slc = &ctrl->chans[chan];
@@ -2781,6 +2793,11 @@ int slim_control_ch(struct slim_device *sb, u16 chanh,
 	int ret = 0;
 	/* Get rid of the group flag in MSB if any */
 	u8 chan = SLIM_HDL_TO_CHIDX(chanh);
+	/*OPPO 2013-04-19 zhzhyon Add for no voice*/
+	#ifdef CONFIG_VENDOR_EDIT
+	u8 nchan = 0;
+	#endif
+	/*OPPO 2013-04-19 zhzhyon Add end*/
 	struct slim_ich *slc = &ctrl->chans[chan];
 	if (!(slc->nextgrp & SLIM_START_GRP))
 		return -EINVAL;
@@ -2788,6 +2805,12 @@ int slim_control_ch(struct slim_device *sb, u16 chanh,
 	mutex_lock(&sb->sldev_reconf);
 	mutex_lock(&ctrl->m_ctrl);
 	do {
+		/*OPPO 2013-04-19 zhzhyon Add for no voice*/
+		#ifdef CONFIG_VENDOR_EDIT
+		struct slim_pending_ch *pch;
+    u8 add_mark_removal  = true;
+		#endif
+		/*OPPO 2013-04-19 zhzhyon Add end*/
 		slc = &ctrl->chans[chan];
 		dev_dbg(&ctrl->dev, "chan:%d,ctrl:%d,def:%d", chan, chctrl,
 					slc->def);
@@ -2812,14 +2835,56 @@ int slim_control_ch(struct slim_device *sb, u16 chanh,
 				ret = -ENOTCONN;
 				break;
 			}
+			/*OPPO 2013-04-19 zhzhyon Modify for no voice*/
+			#ifndef CONFIG_VENDOR_EDIT
 			ret = add_pending_ch(&sb->mark_removal, chan);
 			if (ret)
 				break;
+			#else
+			/* If channel removal request comes when pending
+       * in the mark_define, remove it from the define
+       * list instead of adding it to removal list
+       */
+       if (!list_empty(&sb->mark_define)) {
+           struct list_head *pos, *next;
+           list_for_each_safe(pos, next,
+                                 &sb->mark_define) {
+                    pch = list_entry(pos,
+                    struct slim_pending_ch,
+                    pending);
+                    if (pch->chan == slc->chan) {
+                            list_del(&pch->pending);
+                            kfree(pch);
+                            add_mark_removal = false;
+                            break;
+                     }
+                               }
+                       }
+                       if (add_mark_removal == true) {
+                               ret = add_pending_ch(&sb->mark_removal, chan);
+                               if (ret)
+                                       break;
+                       }
+			#endif
+			/*OPPO 2013-04-19 zhzhyon Modify end*/
 		}
 
+		/*OPPO 2013-04-19 zhzhyon Modify for no voice*/
+		#ifndef CONFIG_VENDOR_EDIT		
 		if (!(slc->nextgrp & SLIM_END_GRP))
+		#else
+		nchan++;
+		if (nchan < SLIM_GRP_TO_NCHAN(chanh))
+		#endif
+		/*OPPO 2013-04-19 zhzhyon Modify end*/
 			chan = SLIM_HDL_TO_CHIDX(slc->nextgrp);
+	/*OPPO 2013-04-19 zhzhyon Modify for no voice*/
+	#ifndef CONFIG_VENDOR_EDIT
 	} while (!(slc->nextgrp & SLIM_END_GRP));
+	#else
+	} while (nchan < SLIM_GRP_TO_NCHAN(chanh));
+	#endif
+	/*OPPO 2013-04-19 zhzhyon Modify end*/
 	mutex_unlock(&ctrl->m_ctrl);
 	if (!ret && commit == true)
 		ret = slim_reconfigure_now(sb);

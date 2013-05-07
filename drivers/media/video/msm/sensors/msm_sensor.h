@@ -190,6 +190,8 @@ struct msm_sensor_ctrl_t {
 	struct regulator **reg_ptr;
 	struct clk *cam_clk;
 	long clk_rate;
+	int prepared_res;/*OPPO*/
+	int init_state;/*OPPO*/
 };
 
 void msm_sensor_start_stream(struct msm_sensor_ctrl_t *s_ctrl);

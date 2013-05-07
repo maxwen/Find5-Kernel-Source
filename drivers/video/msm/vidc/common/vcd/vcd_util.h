@@ -20,15 +20,18 @@
 #define VCD_MSG_LOW(xx_fmt...)		printk(KERN_INFO "\n\t* " xx_fmt)
 #define VCD_MSG_MED(xx_fmt...)		printk(KERN_INFO "\n  * " xx_fmt)
 #define VCD_MSG_HIGH(xx_fmt...)		printk(KERN_WARNING "\n" xx_fmt)
-#define VCD_MSG_ERROR(xx_fmt...)	printk(KERN_ERR "\n err: " xx_fmt)
+/*OPPO 2013-4-15 Gousj modify begin for log msg level*/
+#define VCD_MSG_ERROR(xx_fmt...)       printk(KERN_ERR "\n err: " xx_fmt)
+
 #else
 
 #define VCD_MSG_LOW(xx_fmt...)
 #define VCD_MSG_MED(xx_fmt...)
 #define VCD_MSG_HIGH(xx_fmt...)
 #define VCD_MSG_ERROR(xx_fmt...)
-#endif
 
+#endif
+/*OPPO 2013-4-15 Gousj modify end*/
 
 #define VCD_MSG_FATAL(xx_fmt...)	printk(KERN_ERR "\n<FATAL> " xx_fmt)
 
